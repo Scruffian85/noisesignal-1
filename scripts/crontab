@@ -1,0 +1,13 @@
+# NoiseSignal Cron Configuration
+# Runs weekly on Sunday at 6:00 AM
+
+# Set PATH for cron environment
+PATH=/usr/local/bin:/usr/bin:/bin
+
+# Weekly execution - Sundays at 6:00 AM
+0 6 * * 0 cd /app && /app/scripts/run_weekly.sh >> /var/log/cron.log 2>&1
+
+# Health check - Daily at 9:00 AM
+0 9 * * * cd /app && /app/scripts/health_check.sh >> /var/log/cron.log 2>&1
+
+# Empty line required at end of crontab file

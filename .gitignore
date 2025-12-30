@@ -1,0 +1,25 @@
+# Python cache
+__pycache__/
+*.pyc
+venv/
+
+# Credentials & Tokens
+secret.json
+token.pickle
+playlist_id.txt
+
+# Output files
+*.csv
+
+# macOS files
+.DS_Store
+**/.DS_Store
+
+# Environment files
+.env
+
+# Data & Logs (may contain sensitive information)
+data/
+
+# Local Claude settings
+.claude/

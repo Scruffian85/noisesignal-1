@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  noisesignal:
+    build: .
+    container_name: noisesignal-automation
+    restart: unless-stopped
+
+    # Environment variables for email and configuration
+    environment:
+      - GMAIL_ADDRESS=${GMAIL_ADDRESS}
+      - GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}
+      - NOTIFICATION_EMAIL=${NOTIFICATION_EMAIL:-daddyfandango@gmail.com}
+      - TZ=${TZ:-UTC}
+      - PYTHONUNBUFFERED=1
+
+    # Volume mounts for persistent data
+    volumes:
+      - ./data:/app/data
+      - ./secret.json:/app/secret.json:ro
+      - ./token.pickle:/app/token.pickle
+      - ./playlist_id.txt:/app/playlist_id.txt
+      - noisesignal-logs:/app/data/logs
+
+    # Health check to monitor container status
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health', timeout=5)"]
+      interval: 30m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # Optional: expose port for monitoring/health checks
+    ports:
+      - "8080:8080"
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+volumes:
+  noisesignal-logs:
+    driver: local
