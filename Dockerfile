@@ -15,14 +15,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application source code
+# Secrets (.env, secret.json, token.pickle) and state (playlist_id.txt, data/)
+# are NOT baked into the image - docker-compose.yml mounts them at runtime.
 COPY *.py ./
-COPY .env .
-COPY secret.json .
-COPY token.pickle .
-COPY *.html .
-COPY *.csv .
-COPY *.txt .
-COPY data/ ./data/
 COPY scripts/ ./scripts/
 
 # Create necessary directories
@@ -46,9 +41,6 @@ RUN crontab /etc/cron.d/noisesignal-cron
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
-
-# Expose port for potential health checks
-EXPOSE 8080
 
 # Start cron daemon and tail logs
 CMD ["sh", "-c", "cron && tail -f /var/log/cron.log"]

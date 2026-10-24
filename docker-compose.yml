@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   noisesignal:
     build: .
@@ -17,22 +15,21 @@ services:
     # Volume mounts for persistent data
     volumes:
       - ./data:/app/data
+      # cron jobs don't inherit the container environment, so the scripts
+      # source /app/.env directly
+      - ./.env:/app/.env:ro
       - ./secret.json:/app/secret.json:ro
       - ./token.pickle:/app/token.pickle
       - ./playlist_id.txt:/app/playlist_id.txt
       - noisesignal-logs:/app/data/logs
 
-    # Health check to monitor container status
+    # Health check: the container is only useful while cron is running
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8080/health', timeout=5)"]
-      interval: 30m
+      test: ["CMD", "pgrep", "-x", "cron"]
+      interval: 5m
       timeout: 10s
       retries: 3
       start_period: 30s
-
-    # Optional: expose port for monitoring/health checks
-    ports:
-      - "8080:8080"
 
     # Logging configuration
     logging:
