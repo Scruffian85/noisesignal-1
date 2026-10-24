@@ -48,3 +48,27 @@ def test_importing_does_not_configure_root_logging():
         assert root.handlers == []
     finally:
         root.handlers[:] = saved
+
+
+def _youtube_with_playlist_items(items):
+    yt = mock.MagicMock()
+    yt.playlists.return_value.list.return_value.execute.return_value = {"items": items}
+    yt.playlists.return_value.insert.return_value.execute.return_value = {"id": "PLnew"}
+    return yt
+
+
+def test_existing_playlist_is_reused(tmp_path):
+    id_file = tmp_path / "playlist_id.txt"
+    id_file.write_text("PLold")
+    yt = _youtube_with_playlist_items([{"id": "PLold"}])
+    assert youtube_client.get_or_create_playlist(yt, str(id_file), "t", "d") == "PLold"
+    yt.playlists.return_value.insert.assert_not_called()
+
+
+@pytest.mark.parametrize("contents", ["PLdeleted", ""])
+def test_missing_playlist_is_recreated(tmp_path, contents):
+    id_file = tmp_path / "playlist_id.txt"
+    id_file.write_text(contents)
+    yt = _youtube_with_playlist_items([])
+    assert youtube_client.get_or_create_playlist(yt, str(id_file), "t", "d") == "PLnew"
+    assert id_file.read_text() == "PLnew"

@@ -74,8 +74,12 @@ def get_or_create_playlist(youtube, playlist_id_file, title, description):
         with open(playlist_id_file, "r") as f:
             playlist_id = f.read().strip()
         try:
-            youtube.playlists().list(part="id", id=playlist_id).execute()
-            logging.info(f"Using existing playlist: {playlist_id}")
+            # A deleted playlist (or empty id file) returns no items, not an error
+            if playlist_id and youtube.playlists().list(part="id", id=playlist_id).execute().get("items"):
+                logging.info(f"Using existing playlist: {playlist_id}")
+            else:
+                logging.warning(f"Playlist '{playlist_id}' not found; creating a new one")
+                playlist_id = None
         except HttpError:
             playlist_id = None
     if not playlist_id:
