@@ -29,16 +29,32 @@ Edit `.env`:
 ```
 GMAIL_ADDRESS=your-email@gmail.com
 GMAIL_APP_PASSWORD=your-16-character-app-password
-NOTIFICATION_EMAIL=daddyfandango@gmail.com
-TZ=America/New_York
+NOTIFICATION_EMAIL=you@example.com
+TZ=Europe/London
 ```
+
+`docker-compose.yml` mounts `.env` into the container read-only, because the
+cron jobs don't inherit the container's environment and source `/app/.env`
+instead. It is not baked into the image.
 
 ### 2. Setup YouTube API
 
 1. Create a Google Cloud Project
 2. Enable the YouTube Data API v3
 3. Create OAuth 2.0 credentials
-4. Download the credentials as `secret.json`
+4. Download the credentials as `secret.json` into the repo directory
+5. Create `token.pickle` once, **on a machine with a browser** (the OAuth flow
+   opens one; it can't run inside the headless container):
+
+```bash
+pip install -r requirements.txt
+python -c "import youtube_client; youtube_client.get_authenticated_service()"
+```
+
+   Then copy `token.pickle` to the server next to `docker-compose.yml`.
+6. Create the remaining bind-mounted files so Docker doesn't create them as
+   directories: `touch playlist_id.txt` and `mkdir -p data`.
+   An empty `playlist_id.txt` makes the first run create the playlist.
 
 ### 3. Deploy with Docker
 
@@ -73,17 +89,29 @@ NoiseSignal/
 ├── docker-compose.yml       # Container orchestration
 ├── Dockerfile               # Container definition
 ├── requirements.txt         # Python dependencies
-├── .env                     # Environment variables (create from .env.example)
-├── secret.json              # YouTube API credentials
+├── .env.example             # Template for .env
+├── .env                     # Environment variables (not committed)
+├── secret.json              # YouTube OAuth client (not committed)
+├── token.pickle             # YouTube auth token (not committed)
+├── playlist_id.txt          # Playlist identifier (not committed)
+├── tests/                   # pytest suite
 ├── scripts/
 │   ├── run_weekly.sh        # Weekly execution script
 │   ├── health_check.sh      # System health monitoring
 │   └── crontab              # Cron job configuration
 └── data/
-    ├── logs/                # Application logs
-    ├── token.pickle         # YouTube authentication token
-    └── playlist_id.txt      # Playlist identifier
+    └── logs/                # Application logs (named volume in Docker)
 ```
+
+## Running the tests
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+pytest
+```
+
+`test_email.py` in the repo root is an older manual script that renders the
+sample email HTML files; it isn't part of the pytest run.
 
 ## Automation Schedule
 
@@ -115,11 +143,13 @@ NoiseSignal/
 |----------|-------------|---------|
 | `GMAIL_ADDRESS` | Your Gmail address for sending notifications | Required |
 | `GMAIL_APP_PASSWORD` | Gmail app-specific password | Required |
-| `NOTIFICATION_EMAIL` | Email to receive notifications | `daddyfandango@gmail.com` |
+| `NOTIFICATION_EMAIL` | Email to receive notifications | the owner's address, hard-coded in `config.py` |
 | `EMAIL_ENABLED` | Enable/disable email notifications | `true` |
 | `LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING, ERROR) | `INFO` |
 | `MAX_RETRIES` | Number of retry attempts on failure | `3` |
 | `RETRY_DELAY` | Delay between retries (seconds) | `300` |
+| `EXECUTION_TIMEOUT` | Max seconds per attempt | `3600` |
+| `LOG_FILE` | Application log path | `data/logs/noisesignal.log` |
 | `TZ` | Timezone for scheduling | `UTC` |
 
 ### Music Discovery Parameters
@@ -180,9 +210,9 @@ docker-compose logs
 ### Manual Recovery
 
 ```bash
-# Re-authenticate YouTube
-docker exec noisesignal-automation rm /app/token.pickle
-docker exec noisesignal-automation python -c "import youtube_client; youtube_client.get_authenticated_service()"
+# Re-authenticate YouTube: the OAuth flow needs a browser, so do it on your
+# desktop (see Quick Start section 2, step 5), then copy the new token.pickle over the old one
+# next to docker-compose.yml. It's bind-mounted, so no rebuild is needed.
 
 # Test email notifications
 docker exec noisesignal-automation python -c "
