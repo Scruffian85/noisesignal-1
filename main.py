@@ -3,7 +3,6 @@
 import pandas as pd
 import logging
 import os
-import signal
 from collections import OrderedDict
 from datetime import datetime
 import random
@@ -66,6 +65,7 @@ def main():
 
     # --- Main Search Loop ---
     all_candidate_videos = []
+    quota_exceeded = False
     for task in search_tasks:
         try:
             query = task["query"]
@@ -90,12 +90,15 @@ def main():
             error_content = str(getattr(e, 'content', ''))
             if "quotaExceeded" in str(e) or "quotaExceeded" in error_content:
                 logging.warning("!!! Quota exceeded! Stopping search phase. Processing videos found so far. !!!")
-                break 
+                quota_exceeded = True
+                break
             else:
                 logging.error(f"An unexpected error occurred for task {task}: {e}", exc_info=False)
                 continue
 
     if not all_candidate_videos:
+        if quota_exceeded:
+            raise RuntimeError("YouTube API quota exceeded before any videos were found")
         logging.info("No new candidate videos found in this run. Exiting.")
         return
 

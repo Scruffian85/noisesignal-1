@@ -38,7 +38,7 @@ BASE_SEARCH_QUERIES = [
 
 # --- Filtering & Scoring Parameters ---
 DAYS_SINCE_PUBLISHED = 30 
-PUBLISHED_AFTER = (datetime.datetime.now() - datetime.timedelta(days=DAYS_SINCE_PUBLISHED)).isoformat("T") + "Z"
+PUBLISHED_AFTER = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=DAYS_SINCE_PUBLISHED)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 FINAL_PLAYLIST_SIZE = 25
 

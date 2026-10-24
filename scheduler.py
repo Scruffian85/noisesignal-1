@@ -68,15 +68,15 @@ class ScheduledExecutor:
 
         try:
             main_module.main()
-            signal.alarm(0)  # Cancel the alarm
             return True
         except TimeoutError as e:
             logging.error(f"Execution timeout: {e}")
             return False
         except Exception as e:
-            signal.alarm(0)  # Cancel the alarm
             logging.error(f"Execution failed: {e}")
             return False
+        finally:
+            signal.alarm(0)  # Cancel the alarm
 
     def execute_with_retries(self) -> bool:
         """Execute main process with retry logic."""
@@ -110,14 +110,20 @@ class ScheduledExecutor:
         try:
             # Try to read the results CSV to get track count
             import pandas as pd
-            df = pd.read_csv("emerging_playlist_results.csv")
-            tracks = df.to_dict('records')
+            results_file = "emerging_playlist_results.csv"
+            # main() doesn't rewrite the CSV when it finds nothing, so a file
+            # older than this run is last week's results - don't resend it.
+            if os.path.getmtime(results_file) < self.execution_start_time.timestamp():
+                tracks = []
+            else:
+                tracks = pd.read_csv(results_file).to_dict('records')
 
+            playlist_id = self.get_playlist_id()
             return {
                 'success': True,
                 'tracks_count': len(tracks),
                 'tracks': tracks,
-                'playlist_url': f"https://www.youtube.com/playlist?list={self.get_playlist_id()}"
+                'playlist_url': f"https://www.youtube.com/playlist?list={playlist_id}" if playlist_id else None
             }
         except Exception as e:
             logging.warning(f"Could not read execution results: {e}")
@@ -155,7 +161,7 @@ class ScheduledExecutor:
                 # Send notification that no new tracks were found
                 self.email_notifier.send_success_notification(
                     tracks_added=0,
-                    playlist_url=summary.get('playlist_url', 'N/A'),
+                    playlist_url=summary.get('playlist_url') or 'N/A',
                     execution_time=execution_time
                 )
             else:

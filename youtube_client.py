@@ -1,6 +1,7 @@
 # --- START OF FILE youtube_client.py (Reverted to Stable Baseline) ---
 
 import os
+import sys
 import pickle
 import time
 import logging
@@ -11,8 +12,6 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from config import SCOPES, CLIENT_SECRETS_FILE, TOKEN_FILE
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 def get_authenticated_service():
     creds = None
     if os.path.exists(TOKEN_FILE):
@@ -21,6 +20,14 @@ def get_authenticated_service():
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
+        elif not sys.stdin.isatty():
+            # Running from cron: the browser OAuth flow would just block until
+            # the execution timeout. Fail fast so the error email goes out.
+            raise RuntimeError(
+                f"No valid YouTube token in {TOKEN_FILE}. Re-authenticate by running "
+                "`python -c \"import youtube_client; youtube_client.get_authenticated_service()\"` "
+                "on a machine with a browser and copy token.pickle to the server."
+            )
         else:
             flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRETS_FILE, SCOPES)
             creds = flow.run_local_server(port=0)
@@ -39,6 +46,8 @@ def search_videos(youtube, query, max_results, published_after, region_code=None
         response = youtube.search().list(**request_body).execute()
         return response.get("items", [])
     except HttpError as e:
+        if "quotaExceeded" in str(e.content):
+            raise
         logging.error(f"An HTTP error occurred during search: {e.content}")
         return []
 
@@ -65,8 +74,12 @@ def get_or_create_playlist(youtube, playlist_id_file, title, description):
         with open(playlist_id_file, "r") as f:
             playlist_id = f.read().strip()
         try:
-            youtube.playlists().list(part="id", id=playlist_id).execute()
-            logging.info(f"Using existing playlist: {playlist_id}")
+            # A deleted playlist (or empty id file) returns no items, not an error
+            if playlist_id and youtube.playlists().list(part="id", id=playlist_id).execute().get("items"):
+                logging.info(f"Using existing playlist: {playlist_id}")
+            else:
+                logging.warning(f"Playlist '{playlist_id}' not found; creating a new one")
+                playlist_id = None
         except HttpError:
             playlist_id = None
     if not playlist_id:
