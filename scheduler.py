@@ -113,7 +113,9 @@ class ScheduledExecutor:
             results_file = "emerging_playlist_results.csv"
             # main() doesn't rewrite the CSV when it finds nothing, so a file
             # older than this run is last week's results - don't resend it.
-            if os.path.getmtime(results_file) < self.execution_start_time.timestamp():
+            # 1s slack: file mtimes use the kernel's coarse clock, which can
+            # read slightly behind datetime.now() for a file written just after.
+            if os.path.getmtime(results_file) < self.execution_start_time.timestamp() - 1:
                 tracks = []
             else:
                 tracks = pd.read_csv(results_file).to_dict('records')
