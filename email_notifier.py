@@ -3,6 +3,7 @@ Email notification module for NoiseSignal automation.
 Sends weekly summaries and error alerts via Gmail SMTP.
 """
 
+import html
 import smtplib
 import ssl
 import os
@@ -43,7 +44,7 @@ class EmailNotifier:
 
             # Create secure connection and send email
             context = ssl.create_default_context()
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+            with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=30) as server:
                 server.starttls(context=context)
                 server.login(self.sender_email, self.sender_password)
                 server.sendmail(self.sender_email, self.recipient_email, message.as_string())
@@ -103,14 +104,15 @@ class EmailNotifier:
 
     def _generate_weekly_summary_html(self, tracks: List[Dict], playlist_url: str, execution_time: str) -> str:
         """Generate HTML content for weekly summary email."""
+        playlist_url = html.escape(str(playlist_url), quote=True)
         tracks_html = ""
         for i, track in enumerate(tracks[:10], 1):  # Show top 10
             tracks_html += f"""
             <tr style="border-bottom: 1px solid #eee;">
                 <td style="padding: 8px;">{i}</td>
-                <td style="padding: 8px;"><strong>{track.get('title', 'Unknown')}</strong></td>
-                <td style="padding: 8px;">{track.get('artist', 'Unknown')}</td>
-                <td style="padding: 8px;">{track.get('country', 'Unknown')}</td>
+                <td style="padding: 8px;"><strong>{html.escape(str(track.get('title', 'Unknown')))}</strong></td>
+                <td style="padding: 8px;">{html.escape(str(track.get('artist', 'Unknown')))}</td>
+                <td style="padding: 8px;">{html.escape(str(track.get('country', 'Unknown')))}</td>
                 <td style="padding: 8px;">{track.get('views', 0):,}</td>
                 <td style="padding: 8px;">{track.get('final_score', 0):.2f}</td>
             </tr>
@@ -192,6 +194,8 @@ Happy music discovery!
 
     def _generate_error_alert_html(self, error_type: str, error_message: str, execution_time: str) -> str:
         """Generate HTML content for error alert email."""
+        error_type = html.escape(str(error_type))
+        error_message = html.escape(str(error_message))
         return f"""
         <html>
         <head>
